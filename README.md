@@ -139,14 +139,14 @@ uses a Google service account to read mail from a catch-all Gmail inbox via the 
 flowchart LR
     sender[sender on the internet]
     domain[your domain]
-    gmail[Google / Gmail inbox]
+    gmail[Google Gmail inbox]
     mm[micromail]
-    api[/api/i/*]
-    docs[/docs]
+    api[api/i]
+    docs[docs]
 
     sender -->|SMTP| domain
     domain -->|MX records| gmail
-    gmail -->|Gmail API<br/>service account| mm
+    gmail -->|Gmail API, service account| mm
     mm --> api
     mm --> docs
 ```
@@ -158,19 +158,19 @@ uses [Cloudflare Email Routing](https://developers.cloudflare.com/email-routing/
 ```mermaid
 flowchart LR
     sender[sender on the internet]
-    domain[your domain<br/>on Cloudflare]
-    cf[Cloudflare<br/>Email Routing]
-    worker[Email Worker<br/>postal-mime]
+    domain[your domain on Cloudflare]
+    cf[Cloudflare Email Routing]
+    worker[Email Worker, postal-mime]
     db[Cloudflare D1]
-    r2[Cloudflare R2<br/>attachments]
+    r2[Cloudflare R2 attachments]
     mm[micromail]
-    api[/api/i/*]
-    docs[/docs]
+    api[api/i]
+    docs[docs]
 
     sender -->|SMTP| domain
     domain -->|MX records| cf
     cf -->|email event| worker
-    worker -->|parse & store| db
+    worker -->|parse and store| db
     worker -.->|attachments| r2
     db -->|D1 HTTP API| mm
     r2 -.->|R2 API| mm
