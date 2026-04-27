@@ -1,6 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
+import { Select } from "@base-ui/react/select";
+import { Button } from "@base-ui/react/button";
+import { Input } from "@base-ui/react/input";
+import { Tooltip } from "@base-ui/react/tooltip";
 
 interface EmailMessage {
   id: string;
@@ -14,34 +18,19 @@ interface EmailMessage {
   labels: string[];
 }
 
-// ---------------------------------------------------------------------------
-// Inline icon components (no lucide dependency at runtime)
-// ---------------------------------------------------------------------------
-
-function IconMail({ className }: { className?: string }) {
+function CheckIcon(props: React.ComponentProps<"svg">) {
   return (
-    <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <rect x="2" y="4" width="20" height="16" rx="2" />
-      <path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7" />
+    <svg fill="currentcolor" width="10" height="10" viewBox="0 0 10 10" {...props}>
+      <path d="M9.1603 1.12218C9.50684 1.34873 9.60427 1.81354 9.37792 2.16038L5.13603 8.66012C5.01614 8.8438 4.82192 8.96576 4.60451 8.99384C4.3871 9.02194 4.1683 8.95335 4.00574 8.80615L1.24664 6.30769C0.939709 6.02975 0.916013 5.55541 1.19372 5.24822C1.47142 4.94102 1.94536 4.91731 2.2523 5.19524L4.36085 7.10461L8.12299 1.33999C8.34934 0.993152 8.81376 0.895638 9.1603 1.12218Z" />
     </svg>
   );
 }
 
-function IconShuffle({ className }: { className?: string }) {
+function ChevronUpDownIcon(props: React.ComponentProps<"svg">) {
   return (
-    <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="m18 14 4 4-4 4" /><path d="m18 2 4 4-4 4" />
-      <path d="M2 18h1.973a4 4 0 0 0 3.3-1.7l5.454-8.6a4 4 0 0 1 3.3-1.7H22" />
-      <path d="M2 6h1.972a4 4 0 0 1 3.6 2.2" />
-      <path d="M22 18h-6.041a4 4 0 0 1-3.3-1.8l-.359-.45" />
-    </svg>
-  );
-}
-
-function IconArrowRight({ className }: { className?: string }) {
-  return (
-    <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="M5 12h14" /><path d="m12 5 7 7-7 7" />
+    <svg width="8" height="12" viewBox="0 0 8 12" fill="none" stroke="currentcolor" strokeWidth={1.5} {...props}>
+      <path d="M0.5 4.5L4 1.5L7.5 4.5" />
+      <path d="M0.5 7.5L4 10.5L7.5 7.5" />
     </svg>
   );
 }
@@ -97,10 +86,23 @@ function IconX({ className }: { className?: string }) {
   );
 }
 
-function IconChevronDown({ className }: { className?: string }) {
+function IconShuffle({ className }: { className?: string }) {
+  return (
+    <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <polyline points="16 3 21 3 21 8" />
+      <line x1="4" y1="20" x2="21" y2="3" />
+      <polyline points="21 16 21 21 16 21" />
+      <line x1="15" y1="15" x2="21" y2="21" />
+      <line x1="4" y1="4" x2="9" y2="9" />
+    </svg>
+  );
+}
+
+function IconArrowRight({ className }: { className?: string }) {
   return (
     <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="m6 9 6 6 6-6" />
+      <path d="M5 12h14" />
+      <path d="m12 5 7 7-7 7" />
     </svg>
   );
 }
@@ -134,7 +136,6 @@ export default function Home() {
   const [username, setUsername] = useState("");
   const [domains, setDomains] = useState<string[]>([]);
   const [selectedDomain, setSelectedDomain] = useState("");
-  const [domainDropdownOpen, setDomainDropdownOpen] = useState(false);
   const [activeEmail, setActiveEmail] = useState("");
   const [messages, setMessages] = useState<EmailMessage[]>([]);
   const [selectedMessage, setSelectedMessage] = useState<EmailMessage | null>(null);
@@ -142,10 +143,6 @@ export default function Home() {
   const [copied, setCopied] = useState(false);
   const [domainLoadError, setDomainLoadError] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  useEffect(() => {
-    fetchDomains();
-  }, []);
 
   const fetchDomains = async () => {
     try {
@@ -161,6 +158,9 @@ export default function Home() {
       setDomainLoadError(true);
     }
   };
+
+  // Build domain items for Base UI Select
+  const domainItems = domains.map((d) => ({ label: d, value: d }));
 
   const generateRandom = () => {
     const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
@@ -226,7 +226,10 @@ export default function Home() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Polling
+  useEffect(() => {
+    void fetchDomains();
+  }, []);
+
   useEffect(() => {
     if (!activeEmail) return;
     if (pollRef.current) clearInterval(pollRef.current);
@@ -240,16 +243,10 @@ export default function Home() {
       } catch { /* */ }
     }, 5000);
 
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
   }, [activeEmail]);
-
-  // Close dropdown on outside click
-  useEffect(() => {
-    if (!domainDropdownOpen) return;
-    const handler = () => setDomainDropdownOpen(false);
-    document.addEventListener("click", handler);
-    return () => document.removeEventListener("click", handler);
-  }, [domainDropdownOpen]);
 
   const canGenerate = username.trim().length > 0 && selectedDomain.length > 0;
 
@@ -299,57 +296,76 @@ export default function Home() {
               <div className="flex flex-col sm:flex-row gap-2.5">
                 {/* Username input */}
                 <div className="relative flex-1">
-                  <input
+                  <Input
                     className="h-11 w-full rounded-xl border border-stone-200 bg-stone-50 px-3.5 pr-10 text-sm text-stone-900 placeholder:text-stone-400 outline-none focus:border-stone-400 focus:bg-white transition-colors"
                     placeholder="username"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && generateEmail()}
                   />
-                  <button
-                    type="button"
-                    onClick={generateRandom}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors cursor-pointer"
-                    title="Random username"
-                  >
-                    <IconShuffle className="text-sm" />
-                  </button>
+                  <Tooltip.Provider>
+                    <Tooltip.Root>
+                      <Tooltip.Trigger
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors cursor-pointer"
+                        onClick={generateRandom}
+                      >
+                        <IconShuffle className="text-sm" />
+                      </Tooltip.Trigger>
+                      <Tooltip.Portal>
+                        <Tooltip.Positioner sideOffset={8}>
+                          <Tooltip.Popup className="rounded-md bg-stone-900 px-2 py-1 text-xs text-white shadow-md origin-[var(--transform-origin)] transition-[transform,opacity] data-[starting-style]:opacity-0 data-[starting-style]:scale-90 data-[ending-style]:opacity-0 data-[ending-style]:scale-90">
+                            Random username
+                          </Tooltip.Popup>
+                        </Tooltip.Positioner>
+                      </Tooltip.Portal>
+                    </Tooltip.Root>
+                  </Tooltip.Provider>
                 </div>
 
-                {/* Domain selector */}
-                <div className="relative">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setDomainDropdownOpen(!domainDropdownOpen); }}
-                    className="h-11 rounded-xl border border-stone-200 bg-stone-50 px-3.5 text-sm text-stone-700 flex items-center gap-1.5 hover:border-stone-300 focus:border-stone-400 transition-colors cursor-pointer min-w-[140px]"
-                  >
+                {/* Domain selector - Base UI Select */}
+                <Select.Root
+                  value={selectedDomain}
+                  onValueChange={(v) => { if (v !== null) setSelectedDomain(v); }}
+                  items={domainItems}
+                >
+                  <Select.Trigger className="h-11 rounded-xl border border-stone-200 bg-stone-50 px-3.5 text-sm text-stone-700 flex items-center gap-1.5 hover:border-stone-300 focus:border-stone-400 transition-colors cursor-pointer min-w-[140px]">
                     <span className="text-stone-400">@</span>
-                    <span className="truncate">{selectedDomain || "domain"}</span>
-                    <IconChevronDown className="text-xs text-stone-400 ml-auto shrink-0" />
-                  </button>
-                  {domainDropdownOpen && (
-                    <div className="absolute top-full mt-1 left-0 right-0 bg-white rounded-xl border border-stone-200 shadow-lg py-1 z-10 animate-[fade-in_0.15s_ease-out]">
-                      {domains.map((d) => (
-                        <button
-                          key={d}
-                          onClick={() => { setSelectedDomain(d); setDomainDropdownOpen(false); }}
-                          className={`w-full text-left px-3.5 py-2 text-sm hover:bg-stone-50 transition-colors cursor-pointer ${d === selectedDomain ? "text-stone-900 font-medium" : "text-stone-600"}`}
-                        >
-                          @{d}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                    <Select.Value className="truncate data-[placeholder]:opacity-60" placeholder="domain" />
+                    <Select.Icon className="flex ml-auto shrink-0">
+                      <ChevronUpDownIcon className="text-stone-400" />
+                    </Select.Icon>
+                  </Select.Trigger>
+                  <Select.Portal>
+                    <Select.Positioner className="outline-hidden z-10" sideOffset={4}>
+                      <Select.Popup className="group min-w-[var(--anchor-width)] origin-[var(--transform-origin)] rounded-md bg-[canvas] text-stone-900 shadow-lg outline outline-1 outline-stone-200 transition-[transform,scale,opacity] data-[ending-style]:scale-90 data-[ending-style]:opacity-0 data-[starting-style]:scale-90 data-[starting-style]:opacity-0">
+                        <Select.List className="py-1 overflow-y-auto max-h-[var(--available-height)]">
+                          {domainItems.map(({ label, value }) => (
+                            <Select.Item
+                              key={value}
+                              value={value}
+                              className="grid cursor-default grid-cols-[0.75rem_1fr] items-center gap-2 py-2 pr-4 pl-2.5 text-sm outline-hidden select-none data-[highlighted]:relative data-[highlighted]:z-0 data-[highlighted]:text-stone-50 data-[highlighted]:before:absolute data-[highlighted]:before:inset-x-1 data-[highlighted]:before:inset-y-0 data-[highlighted]:before:z-[-1] data-[highlighted]:before:rounded-sm data-[highlighted]:before:bg-stone-900"
+                            >
+                              <Select.ItemIndicator className="col-start-1">
+                                <CheckIcon className="size-3" />
+                              </Select.ItemIndicator>
+                              <Select.ItemText className="col-start-2">@{label}</Select.ItemText>
+                            </Select.Item>
+                          ))}
+                        </Select.List>
+                      </Select.Popup>
+                    </Select.Positioner>
+                  </Select.Portal>
+                </Select.Root>
 
                 {/* Generate button */}
-                <button
-                  className="h-11 px-5 rounded-xl bg-stone-900 text-white text-sm font-medium flex items-center justify-center gap-2 hover:bg-stone-800 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shrink-0"
+                <Button
+                  className="h-11 px-5 rounded-xl bg-stone-900 text-white text-sm font-medium flex items-center justify-center gap-2 hover:bg-stone-800 active:bg-stone-700 focus-visible:outline-2 focus-visible:-outline-offset-1 focus-visible:outline-stone-900 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shrink-0 select-none"
                   disabled={!canGenerate}
                   onClick={generateEmail}
                 >
                   <IconArrowRight className="text-sm" />
                   <span>Generate</span>
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -364,13 +380,24 @@ export default function Home() {
                     {activeEmail}
                   </span>
                 </div>
-                <button
-                  onClick={copyEmail}
-                  className="flex items-center gap-1.5 text-xs font-medium text-stone-500 hover:text-stone-900 px-2.5 py-1.5 rounded-lg hover:bg-stone-100 transition-colors cursor-pointer shrink-0"
-                >
-                  {copied ? <IconCheck className="text-emerald-600" /> : <IconCopy className="text-sm" />}
-                  {copied ? "Copied" : "Copy"}
-                </button>
+                <Tooltip.Provider>
+                  <Tooltip.Root>
+                    <Tooltip.Trigger
+                      className="flex items-center gap-1.5 text-xs font-medium text-stone-500 hover:text-stone-900 px-2.5 py-1.5 rounded-lg hover:bg-stone-100 transition-colors cursor-pointer shrink-0"
+                      onClick={copyEmail}
+                    >
+                      {copied ? <IconCheck className="text-emerald-600" /> : <IconCopy className="text-sm" />}
+                      {copied ? "Copied" : "Copy"}
+                    </Tooltip.Trigger>
+                    <Tooltip.Portal>
+                      <Tooltip.Positioner sideOffset={8}>
+                        <Tooltip.Popup className="rounded-md bg-stone-900 px-2 py-1 text-xs text-white shadow-md origin-[var(--transform-origin)] transition-[transform,opacity] data-[starting-style]:opacity-0 data-[starting-style]:scale-90 data-[ending-style]:opacity-0 data-[ending-style]:scale-90">
+                          Copy email
+                        </Tooltip.Popup>
+                      </Tooltip.Positioner>
+                    </Tooltip.Portal>
+                  </Tooltip.Root>
+                </Tooltip.Provider>
               </div>
             )}
           </div>
@@ -417,13 +444,23 @@ export default function Home() {
                         <p className="text-sm text-stone-700 truncate mt-0.5">{msg.subject || "(no subject)"}</p>
                         <p className="text-xs text-stone-400 truncate mt-0.5 leading-relaxed">{msg.snippet}</p>
                       </div>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); deleteMessage(msg.id); }}
-                        className="p-1.5 rounded-lg text-stone-300 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0 cursor-pointer mt-0.5"
-                        title="Delete"
-                      >
-                        <IconTrash className="text-sm" />
-                      </button>
+                      <Tooltip.Provider>
+                        <Tooltip.Root>
+                          <Tooltip.Trigger
+                            className="p-1.5 rounded-lg text-stone-300 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0 cursor-pointer mt-0.5"
+                            onClick={(e: React.MouseEvent) => { e.stopPropagation(); deleteMessage(msg.id); }}
+                          >
+                            <IconTrash className="text-sm" />
+                          </Tooltip.Trigger>
+                          <Tooltip.Portal>
+                            <Tooltip.Positioner sideOffset={8}>
+                              <Tooltip.Popup className="rounded-md bg-stone-900 px-2 py-1 text-xs text-white shadow-md origin-[var(--transform-origin)] transition-[transform,opacity] data-[starting-style]:opacity-0 data-[starting-style]:scale-90 data-[ending-style]:opacity-0 data-[ending-style]:scale-90">
+                                Delete
+                              </Tooltip.Popup>
+                            </Tooltip.Positioner>
+                          </Tooltip.Portal>
+                        </Tooltip.Root>
+                      </Tooltip.Provider>
                     </div>
                   ))}
                 </div>
@@ -435,12 +472,23 @@ export default function Home() {
                       <h3 className="text-lg font-semibold text-stone-900 leading-snug">
                         {selectedMessage.subject || "(no subject)"}
                       </h3>
-                      <button
-                        onClick={() => setSelectedMessage(null)}
-                        className="p-1 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors cursor-pointer shrink-0"
-                      >
-                        <IconX className="text-sm" />
-                      </button>
+                      <Tooltip.Provider>
+                        <Tooltip.Root>
+                          <Tooltip.Trigger
+                            className="p-1 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors cursor-pointer shrink-0"
+                            onClick={() => setSelectedMessage(null)}
+                          >
+                            <IconX className="text-sm" />
+                          </Tooltip.Trigger>
+                          <Tooltip.Portal>
+                            <Tooltip.Positioner sideOffset={8}>
+                              <Tooltip.Popup className="rounded-md bg-stone-900 px-2 py-1 text-xs text-white shadow-md origin-[var(--transform-origin)] transition-[transform,opacity] data-[starting-style]:opacity-0 data-[starting-style]:scale-90 data-[ending-style]:opacity-0 data-[ending-style]:scale-90">
+                                Close
+                              </Tooltip.Popup>
+                            </Tooltip.Positioner>
+                          </Tooltip.Portal>
+                        </Tooltip.Root>
+                      </Tooltip.Provider>
                     </div>
                     <div className="space-y-1 text-xs text-stone-500 mb-5">
                       <p><span className="font-medium text-stone-600">From</span> {selectedMessage.from}</p>
