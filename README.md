@@ -1,36 +1,158 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+<p align="center">
+  <img src="public/logo.png" alt="micromail" width="480">
+</p>
 
-## Getting Started
+<p align="center">
+  <a href="https://github.com/Microck/micromail/releases"><img src="https://img.shields.io/github/v/release/Microck/micromail?display_name=tag&style=flat-square&label=release&color=000000" alt="release badge"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-mit-000000?style=flat-square" alt="license badge"></a>
+</p>
 
-First, run the development server:
+---
+
+`micromail` is a self-hosted temporary email service built with Next.js and the Gmail API. you point your domains at Google, and it turns a single Gmail inbox into unlimited disposable addresses. no sign-up, no tracking, no third-party mail provider.
+
+## how it works
+
+1. you own one or more domains
+2. point their MX records at Google (Google Workspace or a catch-all Gmail setup)
+3. create a Google Cloud service account with Gmail API access and domain-wide delegation
+4. all mail to `anything@yourdomain.com` lands in one Gmail inbox
+5. micromail reads it via the Gmail API and presents each `user@domain` as a separate temporary mailbox
+
+the frontend polls every 5 seconds so new messages appear automatically. the API is fully documented with an interactive Scalar docs page at `/docs`.
+
+## features
+
+- multi-domain support out of the box - add as many domains as you want, just update `.env`
+- real-time inbox polling without websockets
+- random username generation
+- full message body rendering (HTML and plain text)
+- delete messages (moves to Gmail trash)
+- API key authentication (header, bearer token, or query param)
+- interactive API docs via Scalar at `/docs`
+- OpenAPI 3.1 spec at `/api/openapi.json`
+- light mode, clean UI
+
+## prerequisites
+
+- a Google Cloud project with the Gmail API enabled
+- a Google Workspace domain with catch-all email routing (or a regular Gmail account with domain setup)
+- a service account with domain-wide delegation for scope `https://www.googleapis.com/auth/gmail.modify`
+
+## setup
+
+### 1. Google Cloud
+
+1. go to [Google Cloud Console](https://console.cloud.google.com/)
+2. create a project (or select existing)
+3. enable the **Gmail API**
+4. go to **IAM & Admin > Service Accounts**
+5. create a service account
+6. create a JSON key and download it
+7. in Google Workspace Admin, enable **Domain-wide Delegation** for the service account client ID with scope `https://www.googleapis.com/auth/gmail.modify`
+
+### 2. domain MX records
+
+point your domain at Google:
+
+| priority | mail server |
+| --- | --- |
+| 1 | `ASPMX.L.GOOGLE.COM` |
+| 5 | `ALT1.ASPMX.L.GOOGLE.COM` |
+| 5 | `ALT2.ASPMX.L.GOOGLE.COM` |
+| 10 | `ALT3.ASPMX.L.GOOGLE.COM` |
+| 10 | `ALT4.ASPMX.L.GOOGLE.COM` |
+
+set up a catch-all routing rule in Google Workspace Admin so all mail to `*@yourdomain.com` goes to a single Gmail user.
+
+### 3. environment
+
+copy `.env.example` to `.env.local` and fill in:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+cp .env.example .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+```env
+# paste the full service account JSON
+GOOGLE_SERVICE_ACCOUNT={"type":"service_account",...}
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+# the Gmail address that receives all catch-all emails
+GMAIL_USER=admin@yourdomain.com
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# domains you want to allow (comma-separated)
+ALLOWED_DOMAINS=yourdomain.com,yourotherdomain.com
 
-## Learn More
+# secret API key for authentication (leave empty to disable)
+API_KEY=your-secret-api-key-here
+```
 
-To learn more about Next.js, take a look at the following resources:
+### 4. install and run
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```bash
+npm install
+npm run dev
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+open `http://localhost:3000`
 
-## Deploy on Vercel
+## api
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| endpoint | method | description |
+| --- | --- | --- |
+| `/api/domains` | `GET` | list allowed domains |
+| `/api/i/{username}/{domain}` | `GET` | get inbox messages |
+| `/api/i/{username}/{domain}/{id}` | `GET` | get a single message |
+| `/api/i/{username}/{domain}/{id}` | `DELETE` | delete a message (move to trash) |
+| `/api/openapi.json` | `GET` | OpenAPI 3.1 spec |
+| `/docs` | `GET` | interactive Scalar API docs |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### authentication
+
+all API endpoints accept an API key via:
+
+- `x-api-key` header
+- `Authorization: Bearer <key>` header
+- `?api_key=` query parameter
+
+leave `API_KEY` empty in your environment to disable authentication.
+
+## deployment
+
+works on Vercel, Netlify, or any Node.js host:
+
+```bash
+npm run build
+npm start
+```
+
+for Vercel, connect the repo and add the environment variables.
+
+## architecture
+
+```
+sender on the internet
+        │
+        ▼
+┌──────────────────┐    MX records    ┌───────────────┐
+│   your domain    │─────────────────▶│  Google / Gmail│
+│  (*.yourdomain)  │                  │   inbox        │
+└──────────────────┘                  └───────┬───────┘
+                                              │ Gmail API
+                                              │ (service account)
+                                              ▼
+                                      ┌───────────────┐
+                                      │   micromail    │
+                                      │   (Next.js)    │
+                                      └───────┬───────┘
+                                              │
+                                  ┌───────────┼───────────┐
+                                  │           │           │
+                                  ▼           ▼           ▼
+                              /api/domains  /api/i/*   /docs
+                              (domains)     (inbox)    (Scalar)
+```
+
+## license
+
+[mit license](LICENSE)
