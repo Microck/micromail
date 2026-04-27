@@ -3,6 +3,10 @@
 </p>
 
 <p align="center">
+  <img src="public/banner.png" alt="micromail banner">
+</p>
+
+<p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-mit-000000?style=flat-square" alt="license badge"></a>
 </p>
 
