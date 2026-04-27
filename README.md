@@ -3,7 +3,6 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Microck/micromail/releases"><img src="https://img.shields.io/github/v/release/Microck/micromail?display_name=tag&style=flat-square&label=release&color=000000" alt="release badge"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-mit-000000?style=flat-square" alt="license badge"></a>
 </p>
 
