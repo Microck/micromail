@@ -3,16 +3,18 @@
 </p>
 
 <p align="center">
-  <img src="public/banner.png" alt="micromail banner">
-</p>
-
-<p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-mit-000000?style=flat-square" alt="license badge"></a>
 </p>
+
 
 ---
 
 `micromail` is a self-hosted temporary email service built with Next.js and the Gmail API. you point your domains at Google, and it turns a single Gmail inbox into unlimited disposable addresses. no sign-up, no tracking, no third-party mail provider.
+
+<p align="center">
+  <img src="public/banner.png" alt="micromail banner">
+</p>
+
 
 ## how it works
 
