@@ -5,6 +5,8 @@ import {
   validateApiKey,
   formatMessage,
 } from "@/lib/gmail";
+import { getBackend } from "@/app/api/domains/route";
+import * as cf from "@/lib/cloudflare";
 
 export async function GET(
   request: Request,
@@ -36,6 +38,20 @@ export async function GET(
   }
 
   try {
+    const backend = getBackend();
+
+    if (backend === "cloudflare") {
+      const message = await cf.getMessage(username, domain, id);
+      if (!message) {
+        return NextResponse.json(
+          { success: false, error: "Message not found" },
+          { status: 404 }
+        );
+      }
+      return NextResponse.json({ success: true, message });
+    }
+
+    // Gmail backend (default)
     const gmail = await getGmailClient();
     const msg = await gmail.users.messages.get({
       userId: "me",
@@ -50,7 +66,6 @@ export async function GET(
       );
     }
 
-    // Verify this message was sent to the right email
     const toHeader = msg.data.payload?.headers?.find(
       (h) => h.name?.toLowerCase() === "to"
     );
@@ -70,7 +85,7 @@ export async function GET(
       message: formatMessage(msg.data),
     });
   } catch (error) {
-    console.error("Gmail API error:", error);
+    console.error("API error:", error);
     return NextResponse.json(
       { success: false, error: "Internal server error" },
       { status: 500 }
@@ -108,18 +123,26 @@ export async function DELETE(
   }
 
   try {
+    const backend = getBackend();
+
+    if (backend === "cloudflare") {
+      await cf.deleteMessage(username, domain, id);
+      return NextResponse.json({
+        success: true,
+        message: "Email deleted",
+      });
+    }
+
+    // Gmail backend (default)
     const gmail = await getGmailClient();
-    await gmail.users.messages.trash({
-      userId: "me",
-      id,
-    });
+    await gmail.users.messages.trash({ userId: "me", id });
 
     return NextResponse.json({
       success: true,
       message: "Email moved to trash",
     });
   } catch (error) {
-    console.error("Gmail API error:", error);
+    console.error("API error:", error);
     return NextResponse.json(
       { success: false, error: "Internal server error" },
       { status: 500 }

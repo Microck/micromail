@@ -1,5 +1,13 @@
 import { NextResponse } from "next/server";
-import { getAllowedDomains, validateApiKey } from "@/lib/gmail";
+
+function getBackend() {
+  return (process.env.EMAIL_BACKEND || "gmail").toLowerCase();
+}
+
+export { getBackend };
+
+import { getAllowedDomains as getGmailDomains, validateApiKey } from "@/lib/gmail";
+import * as cf from "@/lib/cloudflare";
 
 export async function GET(request: Request) {
   if (!validateApiKey(request)) {
@@ -13,14 +21,8 @@ export async function GET(request: Request) {
     );
   }
 
-  const apiKey = process.env.API_KEY;
-  // If API key is configured, we already validated above. If not, still allow.
-  // But check if a key was expected and wrong one was provided
-  if (apiKey) {
-    // already validated
-  }
-
-  const domains = getAllowedDomains();
+  const domains =
+    getBackend() === "cloudflare" ? await cf.getDomains() : getGmailDomains();
 
   if (domains.length === 0) {
     return NextResponse.json(

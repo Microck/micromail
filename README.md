@@ -129,28 +129,70 @@ for Vercel, connect the repo and add the environment variables.
 
 ## architecture
 
+micromail supports two email backends. pick the one that fits your setup.
+
+### gmail backend (default)
+
+uses a Google service account to read mail from a catch-all Gmail inbox via the Gmail API. best if you already use Google Workspace.
+
+```mermaid
+flowchart LR
+    sender[sender on the internet]
+    domain[your domain]
+    gmail[Google / Gmail inbox]
+    mm[micromail]
+    api[/api/i/*]
+    docs[/docs]
+
+    sender -->|SMTP| domain
+    domain -->|MX records| gmail
+    gmail -->|Gmail API<br/>service account| mm
+    mm --> api
+    mm --> docs
 ```
-sender on the internet
-        │
-        ▼
-┌──────────────────┐    MX records    ┌───────────────┐
-│   your domain    │─────────────────▶│  Google / Gmail│
-│  (*.yourdomain)  │                  │   inbox        │
-└──────────────────┘                  └───────┬───────┘
-                                              │ Gmail API
-                                              │ (service account)
-                                              ▼
-                                      ┌───────────────┐
-                                      │   micromail    │
-                                      │   (Next.js)    │
-                                      └───────┬───────┘
-                                              │
-                                  ┌───────────┼───────────┐
-                                  │           │           │
-                                  ▼           ▼           ▼
-                              /api/domains  /api/i/*   /docs
-                              (domains)     (inbox)    (Scalar)
+
+### cloudflare email workers backend
+
+uses [Cloudflare Email Routing](https://developers.cloudflare.com/email-routing/) and a [Cloudflare Worker](https://developers.cloudflare.com/workers/) to receive and store email directly. no Gmail, no Google Workspace, no service account. inspired by [cloud-mail](https://github.com/maillab/cloud-mail).
+
+```mermaid
+flowchart LR
+    sender[sender on the internet]
+    domain[your domain<br/>on Cloudflare]
+    cf[Cloudflare<br/>Email Routing]
+    worker[Email Worker<br/>postal-mime]
+    db[Cloudflare D1]
+    r2[Cloudflare R2<br/>attachments]
+    mm[micromail]
+    api[/api/i/*]
+    docs[/docs]
+
+    sender -->|SMTP| domain
+    domain -->|MX records| cf
+    cf -->|email event| worker
+    worker -->|parse & store| db
+    worker -.->|attachments| r2
+    db -->|D1 HTTP API| mm
+    r2 -.->|R2 API| mm
+    mm --> api
+    mm --> docs
 ```
+
+**how it works:**
+
+1. your domain uses Cloudflare DNS with Email Routing enabled
+2. Cloudflare receives inbound email and forwards it to a Worker via the `email()` handler
+3. the Worker parses the raw email with `postal-mime`, stores it in D1 (metadata + body), and uploads attachments to R2
+4. micromail reads from D1 via its REST API instead of the Gmail API
+
+**what you need:**
+
+- a Cloudflare account with Email Routing enabled for your domain
+- a Cloudflare D1 database for mail storage
+- a Cloudflare R2 bucket for attachments (optional)
+- the email Worker deployed alongside micromail (or as a separate Worker)
+
+set `EMAIL_BACKEND=cloudflare` in your environment to switch from Gmail to Cloudflare.
 
 ## license
 

@@ -5,6 +5,8 @@ import {
   validateApiKey,
   formatMessage,
 } from "@/lib/gmail";
+import { getBackend } from "@/app/api/domains/route";
+import * as cf from "@/lib/cloudflare";
 
 export async function GET(
   request: Request,
@@ -36,7 +38,6 @@ export async function GET(
   }
 
   const email = `${username.toLowerCase()}@${domain.toLowerCase()}`;
-
   const url = new URL(request.url);
   const limit = Math.min(
     Math.max(parseInt(url.searchParams.get("limit") || "50") || 50, 1),
@@ -44,9 +45,20 @@ export async function GET(
   );
 
   try {
-    const gmail = await getGmailClient();
+    const backend = getBackend();
 
-    // Search for messages sent to this specific email
+    if (backend === "cloudflare") {
+      const messages = await cf.getInbox(username, domain, limit);
+      return NextResponse.json({
+        success: true,
+        email,
+        count: messages.length,
+        messages,
+      });
+    }
+
+    // Gmail backend (default)
+    const gmail = await getGmailClient();
     const listRes = await gmail.users.messages.list({
       userId: "me",
       q: `to:${email}`,
@@ -64,7 +76,6 @@ export async function GET(
       });
     }
 
-    // Fetch metadata for each message (lightweight)
     const messages = await Promise.all(
       messageIds.map(async (msg) => {
         const full = await gmail.users.messages.get({
@@ -84,7 +95,7 @@ export async function GET(
       messages,
     });
   } catch (error) {
-    console.error("Gmail API error:", error);
+    console.error("API error:", error);
     return NextResponse.json(
       { success: false, error: "Internal server error" },
       { status: 500 }
