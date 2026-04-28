@@ -77,6 +77,7 @@ function rowToMessage(row: D1EmailRow): EmailMessage {
   const html = row.html_body || "";
   const text = row.text_body || "";
   const body = html || text;
+  const snippetSource = text || html;
 
   return {
     id: row.id,
@@ -84,7 +85,7 @@ function rowToMessage(row: D1EmailRow): EmailMessage {
     from: row.from_email,
     to: row.to_email,
     subject: row.subject || "(no subject)",
-    snippet: body.substring(0, 200).replace(/<[^>]*>/g, ""),
+    snippet: snippetSource.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim().substring(0, 200),
     body,
     date: row.received_at,
     labels: row.is_read ? ["INBOX"] : ["INBOX", "UNREAD"],
