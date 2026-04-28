@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   title: "micromail - Disposable Temporary Email",
   description:
     "Generate temporary email addresses instantly. Receive messages in real-time. No sign-up required.",
-  icons: { icon: "/favicon.ico" },
+  icons: { icon: "/favicon.png" },
 };
 
 export default function RootLayout({
