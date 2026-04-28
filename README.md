@@ -200,6 +200,8 @@ flowchart LR
 
 set `EMAIL_BACKEND=cloudflare` in your environment to switch from Gmail to Cloudflare.
 
+See [cloudflare-setup.md](cloudflare-setup.md) for the Namecheap-to-Cloudflare setup flow and the deployable Email Worker in [worker/](worker/).
+
 ## license
 
 [mit license](LICENSE)

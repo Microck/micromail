@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "micromail-email-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-04-28",
+  "d1_databases": [
+    {
+      "binding": "MAIL_DB",
+      "database_name": "micromail-mail",
+      "database_id": "64c71309-70e2-4e74-a540-e687de17c3e6"
+    }
+  ]
+}

@@ -107,6 +107,17 @@ function IconArrowRight({ className }: { className?: string }) {
   );
 }
 
+function IconRefresh({ className }: { className?: string }) {
+  return (
+    <svg width="1em" height="1em" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <path d="M21 12a9 9 0 0 1-15.3 6.4L3 16" />
+      <path d="M3 16v5h5" />
+      <path d="M3 12a9 9 0 0 1 15.3-6.4L21 8" />
+      <path d="M21 8V3h-5" />
+    </svg>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Skeleton loader
 // ---------------------------------------------------------------------------
@@ -142,7 +153,10 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [domainLoadError, setDomainLoadError] = useState(false);
+  const [inboxLoadError, setInboxLoadError] = useState(false);
+  const [refreshIn, setRefreshIn] = useState(5);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchDomains = async () => {
     try {
@@ -174,18 +188,31 @@ export default function Home() {
     const email = `${username.trim().toLowerCase()}@${selectedDomain}`;
     setActiveEmail(email);
     setSelectedMessage(null);
-    fetchMessages(email);
+    void fetchMessages(email, true);
   };
 
-  const fetchMessages = async (email: string) => {
-    setLoading(true);
+  const fetchMessages = async (email: string, showLoading = true) => {
+    if (showLoading) setLoading(true);
+    setInboxLoadError(false);
     try {
       const [user, domain] = email.split("@");
-      const res = await fetch(`/api/i/${encodeURIComponent(user)}/${encodeURIComponent(domain)}`);
+      const res = await fetch(`/api/i/${encodeURIComponent(user)}/${encodeURIComponent(domain)}?limit=50`);
       const data = await res.json();
-      if (data.success) setMessages(data.messages);
-    } catch { /* */ }
-    setLoading(false);
+      if (data.success) {
+        setMessages(data.messages);
+        setRefreshIn(5);
+      } else {
+        setInboxLoadError(true);
+      }
+    } catch {
+      setInboxLoadError(true);
+    }
+    if (showLoading) setLoading(false);
+  };
+
+  const reloadInbox = async () => {
+    if (!activeEmail) return;
+    await fetchMessages(activeEmail, false);
   };
 
   const fetchSingleMessage = async (email: string, id: string): Promise<EmailMessage | null> => {
@@ -233,18 +260,21 @@ export default function Home() {
   useEffect(() => {
     if (!activeEmail) return;
     if (pollRef.current) clearInterval(pollRef.current);
+    if (countdownRef.current) clearInterval(countdownRef.current);
+
+    setRefreshIn(5);
 
     pollRef.current = setInterval(async () => {
-      try {
-        const [user, domain] = activeEmail.split("@");
-        const res = await fetch(`/api/i/${encodeURIComponent(user)}/${encodeURIComponent(domain)}?limit=50`);
-        const data = await res.json();
-        if (data.success) setMessages(data.messages);
-      } catch { /* */ }
+      await fetchMessages(activeEmail, false);
     }, 5000);
+
+    countdownRef.current = setInterval(() => {
+      setRefreshIn((current) => (current <= 1 ? 5 : current - 1));
+    }, 1000);
 
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
+      if (countdownRef.current) clearInterval(countdownRef.current);
     };
   }, [activeEmail]);
 
@@ -373,9 +403,6 @@ export default function Home() {
             {activeEmail && (
               <div className="border-t border-stone-100 px-4 sm:px-5 py-3 flex items-center justify-between bg-stone-50/50">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-stone-900 text-white shrink-0">
-                    <img src="/logo.png" alt="" className="h-4 w-auto brightness-0 invert" />
-                  </div>
                   <span className="text-sm font-medium text-stone-900 truncate font-mono tracking-tight">
                     {activeEmail}
                   </span>
@@ -404,6 +431,24 @@ export default function Home() {
 
           {/* Inbox */}
           <div className="mt-6 rounded-2xl border border-stone-200 bg-white shadow-sm overflow-hidden">
+            {activeEmail && (
+              <div className="flex flex-col gap-3 border-b border-stone-100 bg-stone-50/50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                <div>
+                  <p className="text-sm font-medium text-stone-900">Inbox</p>
+                  <p className="mt-0.5 text-xs text-stone-400">
+                    Auto-refreshes in {refreshIn}s
+                  </p>
+                </div>
+                <Button
+                  className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-stone-200 bg-white px-3 text-xs font-medium text-stone-600 shadow-sm hover:border-stone-300 hover:text-stone-900 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={loading}
+                  onClick={() => void reloadInbox()}
+                >
+                  <IconRefresh className={loading ? "animate-spin" : ""} />
+                  <span>Reload</span>
+                </Button>
+              </div>
+            )}
             {!activeEmail ? (
               <EmptyState
                 icon={<IconInbox className="text-2xl text-stone-300" />}
@@ -512,6 +557,30 @@ export default function Home() {
               </>
             )}
           </div>
+
+          {inboxLoadError && (
+            <div className="mt-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+              Could not load inbox. Check the mail backend configuration and try reload.
+            </div>
+          )}
+
+          {/* Support */}
+          <section className="mt-6 rounded-2xl border border-stone-200 bg-white shadow-sm overflow-hidden">
+            <div className="border-b border-stone-100 px-4 py-4 sm:px-5">
+              <h2 className="text-sm font-semibold text-stone-900">Ad-free and independent</h2>
+              <p className="mt-1 text-sm leading-relaxed text-stone-500">
+                micromail does not run ads, track users, or make money from the page. If it helps you and you want it to stay online longer, you can contribute through Ko-fi.
+              </p>
+            </div>
+            <iframe
+              id="kofiframe"
+              src="https://ko-fi.com/microck/?hidefeed=true&widget=true&embed=true&preview=true"
+              className="block w-full bg-stone-50 p-1"
+              style={{ border: "none" }}
+              height="712"
+              title="microck"
+            />
+          </section>
 
           {/* Error state */}
           {domainLoadError && (
