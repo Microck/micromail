@@ -542,9 +542,27 @@ export default function Home() {
                     </div>
                     <div className="border-t border-stone-100 pt-4">
                       {selectedMessage.body?.includes("<") ? (
-                        <div
-                          className="prose-mail text-sm text-stone-700 leading-relaxed max-w-none"
-                          dangerouslySetInnerHTML={{ __html: selectedMessage.body }}
+                        <iframe
+                          srcDoc={selectedMessage.body}
+                          sandbox=""
+                          className="w-full min-h-[200px] border-0 bg-white prose-mail-iframe"
+                          title="Email content"
+                          onLoad={(e) => {
+                            const iframe = e.currentTarget;
+                            const doc = iframe.contentDocument;
+                            if (!doc || !doc.body) return;
+                            // Style injected emails to not break layout
+                            const style = doc.createElement("style");
+                            style.textContent = `
+                              img { max-width: 100% !important; height: auto !important; }
+                              body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; line-height: 1.6; color: #44403c; }
+                              a { color: #2563eb; }
+                            `;
+                            doc.head.appendChild(style);
+                            // Auto-resize iframe to content
+                            const height = doc.documentElement.scrollHeight;
+                            iframe.style.height = `${Math.max(200, height)}px`;
+                          }}
                         />
                       ) : (
                         <pre className="text-sm text-stone-700 whitespace-pre-wrap font-sans leading-relaxed">

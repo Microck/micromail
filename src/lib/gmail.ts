@@ -39,6 +39,13 @@ export function getAllowedDomains(): string[] {
     .filter(Boolean);
 }
 
+/** Domains removed from ALLOWED_DOMAINS because they lack MX records or are inactive. */
+const DISABLED_DOMAINS = new Set(["relegendabl.es"]);
+
+export function getActiveDomains(): string[] {
+  return getAllowedDomains().filter((d) => !DISABLED_DOMAINS.has(d));
+}
+
 export function validateApiKey(request: Request): boolean {
   const key = process.env.API_KEY;
   if (!key) return true; // no key configured means open access

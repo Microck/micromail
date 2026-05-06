@@ -6,7 +6,7 @@ function getBackend() {
 
 export { getBackend };
 
-import { getAllowedDomains as getGmailDomains, validateApiKey } from "@/lib/gmail";
+import { getActiveDomains as getGmailDomains, validateApiKey } from "@/lib/gmail";
 import * as cf from "@/lib/cloudflare";
 
 export async function GET(request: Request) {
