@@ -10,6 +10,7 @@ import * as cf from "@/lib/cloudflare";
 import { checkRateLimit } from "@/lib/rate-limit";
 
 const MESSAGE_RATE_LIMIT = 120; // requests per minute per IP
+const USERNAME_PATTERN = /^[a-z0-9._%+-]{1,64}$/i;
 
 export async function GET(
   request: Request,
@@ -47,6 +48,13 @@ export async function GET(
   if (!domains.includes(domain.toLowerCase())) {
     return NextResponse.json(
       { success: false, error: "Domain not allowed" },
+      { status: 400 }
+    );
+  }
+
+  if (!USERNAME_PATTERN.test(username)) {
+    return NextResponse.json(
+      { success: false, error: "Invalid username" },
       { status: 400 }
     );
   }
@@ -143,6 +151,13 @@ export async function DELETE(
   if (!domains.includes(domain.toLowerCase())) {
     return NextResponse.json(
       { success: false, error: "Domain not allowed" },
+      { status: 400 }
+    );
+  }
+
+  if (!USERNAME_PATTERN.test(username)) {
+    return NextResponse.json(
+      { success: false, error: "Invalid username" },
       { status: 400 }
     );
   }

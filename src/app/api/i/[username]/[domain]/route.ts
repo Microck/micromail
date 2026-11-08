@@ -12,6 +12,7 @@ import { checkRateLimit } from "@/lib/rate-limit";
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
 const INBOX_RATE_LIMIT = 60; // requests per minute per IP
+const USERNAME_PATTERN = /^[a-z0-9._%+-]{1,64}$/i;
 
 export async function GET(
   request: Request,
@@ -52,6 +53,13 @@ export async function GET(
   if (!domains.includes(domain.toLowerCase())) {
     return NextResponse.json(
       { success: false, error: "Domain not allowed" },
+      { status: 400 }
+    );
+  }
+
+  if (!USERNAME_PATTERN.test(username)) {
+    return NextResponse.json(
+      { success: false, error: "Invalid username" },
       { status: 400 }
     );
   }
