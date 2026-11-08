@@ -18,6 +18,14 @@ interface EmailMessage {
   labels: string[];
 }
 
+// Inbox polling is intentionally conservative: every request costs Gmail API
+// quota and Fluid Active CPU on Vercel. 30s is plenty for a temp inbox.
+const INBOX_LIMIT = 25;
+const POLL_INTERVAL_MS = 30_000;
+const POLL_INTERVAL_S = Math.round(POLL_INTERVAL_MS / 1000);
+const MAX_POLL_BACKOFF_MS = 5 * 60_000;
+const INBOX_OVERLAP_S = 120;
+
 function CheckIcon(props: React.ComponentProps<"svg">) {
   return (
     <svg fill="currentcolor" width="10" height="10" viewBox="0 0 10 10" {...props}>
@@ -154,9 +162,10 @@ export default function Home() {
   const [copied, setCopied] = useState(false);
   const [domainLoadError, setDomainLoadError] = useState(false);
   const [inboxLoadError, setInboxLoadError] = useState(false);
-  const [refreshIn, setRefreshIn] = useState(5);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [refreshIn, setRefreshIn] = useState(POLL_INTERVAL_S);
+  const [pollPaused, setPollPaused] = useState(false);
+  const nextAfterRef = useRef(0);
+  const inFlightRef = useRef(false);
 
   const fetchDomains = async () => {
     try {
@@ -191,23 +200,69 @@ export default function Home() {
     void fetchMessages(email, true);
   };
 
-  const fetchMessages = async (email: string, showLoading = true) => {
+  const fetchMessages = async (
+    email: string,
+    showLoading = true,
+    incremental = false
+  ): Promise<boolean> => {
     if (showLoading) setLoading(true);
-    setInboxLoadError(false);
+    if (!incremental) {
+      nextAfterRef.current = 0;
+      setInboxLoadError(false);
+    }
+
+    // Don't stack polls on top of each other if a request is slow.
+    if (incremental && inFlightRef.current) return true;
+    inFlightRef.current = true;
+
     try {
       const [user, domain] = email.split("@");
-      const res = await fetch(`/api/i/${encodeURIComponent(user)}/${encodeURIComponent(domain)}?limit=50`);
-      const data = await res.json();
-      if (data.success) {
-        setMessages(data.messages);
-        setRefreshIn(5);
-      } else {
-        setInboxLoadError(true);
+      const params = new URLSearchParams({ limit: String(INBOX_LIMIT) });
+      if (incremental && nextAfterRef.current > 0) {
+        params.set("after", String(nextAfterRef.current));
       }
+
+      const res = await fetch(
+        `/api/i/${encodeURIComponent(user)}/${encodeURIComponent(domain)}?${params.toString()}`,
+        { cache: "no-store" }
+      );
+
+      if (!res.ok) {
+        // 429s are expected if a client gets aggressive; the poller backs off.
+        if (res.status !== 429) setInboxLoadError(true);
+        return false;
+      }
+
+      const data = await res.json();
+      if (!data.success) {
+        setInboxLoadError(true);
+        return false;
+      }
+
+      const incoming: EmailMessage[] = Array.isArray(data.messages)
+        ? data.messages
+        : [];
+
+      setMessages((prev) => {
+        if (!incremental || prev.length === 0) return incoming;
+        const seen = new Set(incoming.map((m) => m.id));
+        return [...incoming, ...prev.filter((m) => !seen.has(m.id))];
+      });
+
+      const serverTime =
+        typeof data.serverTime === "number"
+          ? data.serverTime
+          : Math.floor(Date.now() / 1000);
+      nextAfterRef.current = Math.max(1, serverTime - INBOX_OVERLAP_S);
+      setInboxLoadError(false);
+      return true;
     } catch {
       setInboxLoadError(true);
+      return false;
+    } finally {
+      inFlightRef.current = false;
+      if (showLoading) setLoading(false);
     }
-    if (showLoading) setLoading(false);
   };
 
   const reloadInbox = async () => {
@@ -259,22 +314,81 @@ export default function Home() {
 
   useEffect(() => {
     if (!activeEmail) return;
-    if (pollRef.current) clearInterval(pollRef.current);
-    if (countdownRef.current) clearInterval(countdownRef.current);
 
-    setRefreshIn(5);
+    let cancelled = false;
+    let pollTimer: ReturnType<typeof setTimeout> | null = null;
+    let countdownTimer: ReturnType<typeof setInterval> | null = null;
+    let failures = 0;
 
-    pollRef.current = setInterval(async () => {
-      await fetchMessages(activeEmail, false);
-    }, 5000);
+    const clearTimers = () => {
+      if (pollTimer) {
+        clearTimeout(pollTimer);
+        pollTimer = null;
+      }
+      if (countdownTimer) {
+        clearInterval(countdownTimer);
+        countdownTimer = null;
+      }
+    };
 
-    countdownRef.current = setInterval(() => {
-      setRefreshIn((current) => (current <= 1 ? 5 : current - 1));
-    }, 1000);
+    const schedule = (delayMs: number) => {
+      if (cancelled) return;
+      if (countdownTimer) clearInterval(countdownTimer);
+
+      const seconds = Math.max(1, Math.round(delayMs / 1000));
+      setRefreshIn(seconds);
+      countdownTimer = setInterval(() => {
+        setRefreshIn((current) => (current <= 1 ? 0 : current - 1));
+      }, 1000);
+
+      pollTimer = setTimeout(runPoll, delayMs);
+    };
+
+    const runPoll = async () => {
+      if (cancelled) return;
+
+      // Browsers throttle background timers anyway; don't spend CPU or API
+      // quota on an inbox nobody is looking at.
+      if (document.hidden) {
+        setRefreshIn(0);
+        return;
+      }
+
+      const ok = await fetchMessages(activeEmail, false, true);
+      if (cancelled || document.hidden) return;
+
+      failures = ok ? 0 : Math.min(failures + 1, 4);
+      const delay = Math.min(
+        POLL_INTERVAL_MS * 2 ** failures,
+        MAX_POLL_BACKOFF_MS
+      );
+      schedule(delay);
+    };
+
+    const onVisibilityChange = () => {
+      if (document.hidden) {
+        clearTimers();
+        setPollPaused(true);
+        setRefreshIn(0);
+      } else {
+        setPollPaused(false);
+        clearTimers();
+        void runPoll();
+      }
+    };
+
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    setPollPaused(document.hidden);
+    if (document.hidden) {
+      setRefreshIn(0);
+    } else {
+      schedule(POLL_INTERVAL_MS);
+    }
 
     return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-      if (countdownRef.current) clearInterval(countdownRef.current);
+      cancelled = true;
+      clearTimers();
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, [activeEmail]);
 
@@ -436,7 +550,11 @@ export default function Home() {
                 <div>
                   <p className="text-sm font-medium text-stone-900">Inbox</p>
                   <p className="mt-0.5 text-xs text-stone-400">
-                    Auto-refreshes in {refreshIn}s
+                    {pollPaused
+                      ? "Paused while tab is hidden"
+                      : refreshIn > 0
+                        ? `Auto-refreshes in ${refreshIn}s`
+                        : "Refreshing…"}
                   </p>
                 </div>
                 <Button

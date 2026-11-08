@@ -84,7 +84,10 @@ GET /api/domains
 ### Get Inbox Messages
 ```
 GET /api/i/{username}/{domain}?limit=50
+GET /api/i/{username}/{domain}?limit=25&after=1760000000
 ```
+
+`after` is an optional Unix timestamp in seconds. Responses include `serverTime`; pass `serverTime - 120` as `after` on the next request to fetch only new mail.
 
 ### Get Single Message
 ```

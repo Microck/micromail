@@ -7,6 +7,9 @@ import {
 } from "@/lib/gmail";
 import { getBackend } from "@/app/api/domains/route";
 import * as cf from "@/lib/cloudflare";
+import { checkRateLimit } from "@/lib/rate-limit";
+
+const MESSAGE_RATE_LIMIT = 120; // requests per minute per IP
 
 export async function GET(
   request: Request,
@@ -17,6 +20,17 @@ export async function GET(
   }
 ) {
   const { username, domain, id } = await params;
+
+  const rate = checkRateLimit(request, "message", MESSAGE_RATE_LIMIT);
+  if (rate.limited) {
+    return NextResponse.json(
+      { success: false, error: "Too many requests. Please slow down." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(rate.retryAfter) },
+      }
+    );
+  }
 
   if (!validateApiKey(request)) {
     return NextResponse.json(
@@ -102,6 +116,17 @@ export async function DELETE(
   }
 ) {
   const { username, domain, id } = await params;
+
+  const rate = checkRateLimit(request, "message", MESSAGE_RATE_LIMIT);
+  if (rate.limited) {
+    return NextResponse.json(
+      { success: false, error: "Too many requests. Please slow down." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(rate.retryAfter) },
+      }
+    );
+  }
 
   if (!validateApiKey(request)) {
     return NextResponse.json(

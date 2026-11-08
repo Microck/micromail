@@ -119,10 +119,28 @@ export async function getDomains(): Promise<string[]> {
 export async function getInbox(
   username: string,
   domain: string,
-  limit: number
+  limit: number,
+  after = 0
 ): Promise<EmailMessage[]> {
   const { accountId, databaseId, apiToken } = getConfig();
   const email = `${username.toLowerCase()}@${domain.toLowerCase()}`;
+
+  if (after > 0) {
+    // received_at is stored as a UTC datetime string, so compare against
+    // datetime() rather than the raw epoch integer.
+    const rows = await d1Query<D1EmailRow>(
+      accountId,
+      databaseId,
+      apiToken,
+      `SELECT id, message_id, from_email, to_email, subject, text_body, html_body, received_at, is_read
+       FROM emails
+       WHERE to_email = ? AND received_at > datetime(?, 'unixepoch')
+       ORDER BY received_at DESC
+       LIMIT ?`,
+      [email, after, limit]
+    );
+    return rows.map(rowToMessage);
+  }
 
   const rows = await d1Query<D1EmailRow>(
     accountId,

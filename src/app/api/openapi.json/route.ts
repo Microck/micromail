@@ -81,6 +81,14 @@ const openapiSpec = {
             description: "Max messages to return (1-100, default: 50)",
             schema: { type: "integer", minimum: 1, maximum: 100, default: 50 },
           },
+          {
+            name: "after",
+            in: "query",
+            required: false,
+            description:
+              "Only return messages received after this Unix timestamp in seconds. Use `serverTime` from a previous response minus a small overlap for cheap incremental polling.",
+            schema: { type: "integer", minimum: 0 },
+          },
         ],
         responses: {
           "200": {
@@ -92,6 +100,12 @@ const openapiSpec = {
                   properties: {
                     success: { type: "boolean", example: true },
                     email: { type: "string", example: "hello@yourdomain.com" },
+                    serverTime: {
+                      type: "integer",
+                      description:
+                        "Server Unix timestamp in seconds. Pass this back as `after` (minus a small overlap) to fetch only new messages.",
+                      example: 1760000000,
+                    },
                     count: { type: "integer", example: 2 },
                     messages: {
                       type: "array",

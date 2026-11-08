@@ -107,8 +107,8 @@ function extractHeader(
 export function formatMessage(msg: gmail_v1.Schema$Message) {
   const headers = msg.payload?.headers;
   return {
-    id: msg.id,
-    threadId: msg.threadId,
+    id: msg.id || "",
+    threadId: msg.threadId || "",
     from: extractHeader(headers, "From"),
     to: extractHeader(headers, "To"),
     subject: extractHeader(headers, "Subject"),
