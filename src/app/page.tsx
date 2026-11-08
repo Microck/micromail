@@ -166,6 +166,7 @@ export default function Home() {
   const [pollPaused, setPollPaused] = useState(false);
   const nextAfterRef = useRef(0);
   const inFlightRef = useRef(false);
+  const activeEmailRef = useRef("");
 
   const fetchDomains = async () => {
     try {
@@ -195,6 +196,7 @@ export default function Home() {
   const generateEmail = () => {
     if (!username.trim() || !selectedDomain) return;
     const email = `${username.trim().toLowerCase()}@${selectedDomain}`;
+    activeEmailRef.current = email;
     setActiveEmail(email);
     setSelectedMessage(null);
     void fetchMessages(email, true);
@@ -229,15 +231,20 @@ export default function Home() {
 
       if (!res.ok) {
         // 429s are expected if a client gets aggressive; the poller backs off.
+        if (activeEmailRef.current !== email) return false;
         if (res.status !== 429) setInboxLoadError(true);
         return false;
       }
 
       const data = await res.json();
       if (!data.success) {
-        setInboxLoadError(true);
+        if (activeEmailRef.current === email) setInboxLoadError(true);
         return false;
       }
+
+      // The user may have generated a different address while this request
+      // was in flight. Never merge an old inbox into the new one.
+      if (activeEmailRef.current !== email) return false;
 
       const incoming: EmailMessage[] = Array.isArray(data.messages)
         ? data.messages
@@ -257,11 +264,11 @@ export default function Home() {
       setInboxLoadError(false);
       return true;
     } catch {
-      setInboxLoadError(true);
+      if (activeEmailRef.current === email) setInboxLoadError(true);
       return false;
     } finally {
       inFlightRef.current = false;
-      if (showLoading) setLoading(false);
+      if (showLoading && activeEmailRef.current === email) setLoading(false);
     }
   };
 
